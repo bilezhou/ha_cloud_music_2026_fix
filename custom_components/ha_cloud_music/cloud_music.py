@@ -34,8 +34,11 @@ class CloudMusic():
         self.async_media_next_track = async_media_next_track
 
         self.userinfo = {}
-        # 读取用户信息
-        self.userinfo_filepath = self.get_storage_dir('cloud_music.userinfo')
+        # HA 2026 不保证进程工作目录是 /config，必须通过 hass.config
+        # 解析 .storage，否则重启后会读取另一个位置并表现为频繁掉登录。
+        self.userinfo_filepath = hass.config.path(
+            STORAGE_DIR, "cloud_music.userinfo"
+        )
         if os.path.exists(self.userinfo_filepath):
             self.userinfo = load_json(self.userinfo_filepath)
         # 登录二维码
@@ -46,7 +49,7 @@ class CloudMusic():
         }
 
     def get_storage_dir(self, file_name):
-        return os.path.abspath(f'{STORAGE_DIR}/{file_name}')
+        return self.hass.config.path(STORAGE_DIR, file_name)
 
     def netease_image_url(self, url, size=200):
         return f'{url}?param={size}y{size}'
@@ -87,8 +90,8 @@ class CloudMusic():
             if x == '' or x.startswith('Max-Age=') or x.startswith('Expires=') \
                 or x.startswith('Path=') or x.startswith('HTTPOnly'):
                 continue
-            kv = x.split('=')
-            if kv[1] != '':
+            kv = x.split('=', 1)
+            if len(kv) == 2 and kv[1] != '':
                 cookie[kv[0]] = kv[1]
 
         # 设置cookie
@@ -500,3 +503,4 @@ class CloudMusic():
             return MusicInfo(songId, song, singer, album, 0, audio_url, pic, MusicSource.URL.value)
         except Exception as ex:
             print(ex)
+
