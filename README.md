@@ -1,5 +1,9 @@
 # 云音乐
 
+> 本仓库是针对 Home Assistant Core 2026.2+ 的兼容修复版本。
+> 修复了组件路径依赖进程工作目录导致配置流无法加载，以及登录 Cookie
+> 写入错误目录、重启后需要重新登录的问题。原项目版权归原作者所有。
+
 在Home Assistant里使用的网易云音乐插件
 
 [![hacs_badge](https://img.shields.io/badge/Home-Assistant-%23049cdb)](https://www.home-assistant.io/)
@@ -63,3 +67,4 @@ https://github.com/Binaryify/NeteaseCloudMusicApi
 
 #### 关注我的微信订阅号，了解更多HomeAssistant相关知识
 <img src="https://ha.jiluxinqing.com/img/wechat-channel.png" height="160" alt="HomeAssistant家庭助理" title="HomeAssistant家庭助理">
+
