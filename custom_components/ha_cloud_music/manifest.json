@@ -1,7 +1,7 @@
 {
     "domain": "ha_cloud_music",
     "name": "\u4E91\u97F3\u4E50",
-    "version": "2026.7.29",
+    "version": "2026.7.29.1",
     "config_flow": true,
     "documentation": "https://github.com/bilezhou/ha_cloud_music_2026_fix",
     "requirements": [],
