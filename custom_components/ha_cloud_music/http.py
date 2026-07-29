@@ -88,3 +88,37 @@ class HttpView(HomeAssistantView):
         except Exception as ex:
             pass
 
+
+class LyricsView(HomeAssistantView):
+    """Expose the integration's authenticated NetEase lyric request to P4."""
+
+    url = "/cloud_music/api"
+    name = "cloud_music:api"
+    requires_auth = False
+
+    async def get(self, request):
+        if request.query.get("action") != "lyric":
+            return web.json_response(
+                {"error": "unsupported action"}, status=400
+            )
+        try:
+            song_id = int(request.query.get("id", "0"))
+        except (TypeError, ValueError):
+            song_id = 0
+        if song_id <= 0:
+            return web.json_response(
+                {"error": "invalid song id"}, status=400
+            )
+
+        hass = request.app["hass"]
+        cloud_music = hass.data["cloud_music"]
+        try:
+            payload = await cloud_music.netease_cloud_music(
+                f"/lyric?id={song_id}"
+            )
+        except Exception as ex:
+            return web.json_response(
+                {"error": str(ex)}, status=502
+            )
+        return web.json_response(payload)
+
