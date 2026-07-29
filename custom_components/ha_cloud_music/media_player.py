@@ -104,10 +104,20 @@ class CloudMusicMediaPlayer(MediaPlayerEntity):
         self.before_state: dict[str, Any] | None = None
         self.current_state: str | None = None
 
+        self._source_players = source_players
         self._source_to_entity: dict[str, str] = {}
+        self.source_media_player = source_players[0] if source_players else None
+        self._attr_source_list: list[str] = []
+        self._attr_source = None
+        self._refresh_source_labels()
+
+    def _refresh_source_labels(self) -> None:
+        """Refresh source labels after target media players finish starting."""
+        previous_entity = self.source_media_player
+        source_to_entity: dict[str, str] = {}
         used_labels: set[str] = set()
-        for entity_id in source_players:
-            state = hass.states.get(entity_id)
+        for entity_id in self._source_players:
+            state = self.hass.states.get(entity_id)
             friendly_name = (
                 state.attributes.get("friendly_name") if state is not None else None
             )
@@ -116,19 +126,27 @@ class CloudMusicMediaPlayer(MediaPlayerEntity):
             if label in used_labels:
                 label = f"{base_label}（{entity_id}）"
             used_labels.add(label)
-            self._source_to_entity[label] = entity_id
-        self._attr_source_list = list(self._source_to_entity)
-        self._attr_source = (
-            self._attr_source_list[0] if self._attr_source_list else None
-        )
+            source_to_entity[label] = entity_id
+
+        self._source_to_entity = source_to_entity
+        self._attr_source_list = list(source_to_entity)
         self.source_media_player = (
-            self._source_to_entity.get(self._attr_source)
-            if self._attr_source is not None
-            else None
+            previous_entity
+            if previous_entity in source_to_entity.values()
+            else next(iter(source_to_entity.values()), None)
+        )
+        self._attr_source = next(
+            (
+                label
+                for label, entity_id in source_to_entity.items()
+                if entity_id == self.source_media_player
+            ),
+            None,
         )
 
     def interval(self, now: datetime.datetime) -> None:
         """同步当前目标播放器状态并在结束时自动下一曲。"""
+        self._refresh_source_labels()
         if self._attr_state == STATE_PAUSED:
             return
         media_player = self.media_player
