@@ -72,8 +72,9 @@ async def async_setup_entry(
 
     async def media_player_interval(now: datetime.datetime) -> None:
         # Home Assistant 2026.2 runs synchronous interval callbacks in an
-        # executor. Keep this callback async so entity state is updated on
-        # the event loop instead of raising a thread-safety error every second.
+        # executor.  Keep this callback async so entity state is updated on
+        # the event loop instead of raising a thread-safety RuntimeError every
+        # second.
         for player in entities:
             player.interval(now)
 
@@ -109,6 +110,7 @@ class CloudMusicMediaPlayer(MediaPlayerEntity):
 
         self._source_players = source_players
         self._source_to_entity: dict[str, str] = {}
+        self._source_switch_generation = 0
         self.source_media_player = source_players[0] if source_players else None
         self._attr_source_list: list[str] = []
         self._attr_source = None
@@ -246,20 +248,51 @@ class CloudMusicMediaPlayer(MediaPlayerEntity):
         self.before_state = None
         self.current_state = None
         self.async_write_ha_state()
+        self._source_switch_generation += 1
         if (
             entity_id != previous_entity
             and media_content_id
-            and previous_state in (STATE_PLAYING, STATE_PAUSED)
+            and previous_state == STATE_PLAYING
         ):
-            await self.async_call(
-                "play_media",
-                {
-                    "media_content_id": media_content_id,
-                    "media_content_type": "music",
-                },
+            generation = self._source_switch_generation
+            self.hass.async_create_task(
+                self._async_handoff_source(
+                    previous_entity,
+                    entity_id,
+                    media_content_id,
+                    generation,
+                )
             )
-            if previous_state == STATE_PAUSED:
-                await self.async_call("media_pause")
+
+    async def _async_handoff_source(
+        self,
+        previous_entity: str | None,
+        target_entity: str,
+        media_content_id: str,
+        generation: int,
+    ) -> None:
+        """Move an active stream without blocking select_source."""
+        if generation != self._source_switch_generation:
+            return
+        if previous_entity and previous_entity != target_entity:
+            await self.hass.services.async_call(
+                "media_player",
+                "media_pause",
+                {"entity_id": previous_entity},
+                blocking=False,
+            )
+        if generation != self._source_switch_generation:
+            return
+        await self.hass.services.async_call(
+            "media_player",
+            "play_media",
+            {
+                "entity_id": target_entity,
+                "media_content_id": media_content_id,
+                "media_content_type": "music",
+            },
+            blocking=False,
+        )
 
     async def async_browse_media(
         self, media_content_type=None, media_content_id=None
