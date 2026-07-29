@@ -217,10 +217,17 @@ class CloudMusicMediaPlayer(MediaPlayerEntity):
 
     @property
     def extra_state_attributes(self):
+        song_id = 0
+        if hasattr(self, "playlist") and self.playlist:
+            try:
+                song_id = int(self.playlist[self.playindex].id)
+            except (AttributeError, IndexError, TypeError, ValueError):
+                song_id = 0
         return {
             **self._attributes,
             "target_entity_id": self.source_media_player,
             "target_count": len(self._source_to_entity),
+            "song_id": song_id,
         }
 
     async def async_select_source(self, source: str) -> None:
@@ -228,11 +235,28 @@ class CloudMusicMediaPlayer(MediaPlayerEntity):
         if entity_id is None:
             _LOGGER.warning("忽略未知播放源：%s", source)
             return
+        previous_entity = self.source_media_player
+        previous_state = self._attr_state
+        media_content_id = getattr(self, "_attr_media_content_id", None)
         self._attr_source = source
         self.source_media_player = entity_id
         self.before_state = None
         self.current_state = None
         self.async_write_ha_state()
+        if (
+            entity_id != previous_entity
+            and media_content_id
+            and previous_state in (STATE_PLAYING, STATE_PAUSED)
+        ):
+            await self.async_call(
+                "play_media",
+                {
+                    "media_content_id": media_content_id,
+                    "media_content_type": "music",
+                },
+            )
+            if previous_state == STATE_PAUSED:
+                await self.async_call("media_pause")
 
     async def async_browse_media(
         self, media_content_type=None, media_content_id=None
