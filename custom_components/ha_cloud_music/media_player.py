@@ -70,7 +70,10 @@ async def async_setup_entry(
     # 并且在集成选项里添加播放器后不再出现“实体消失”的错觉。
     entities = [CloudMusicMediaPlayer(hass, source_players)]
 
-    def media_player_interval(now: datetime.datetime) -> None:
+    async def media_player_interval(now: datetime.datetime) -> None:
+        # Home Assistant 2026.2 runs synchronous interval callbacks in an
+        # executor. Keep this callback async so entity state is updated on
+        # the event loop instead of raising a thread-safety error every second.
         for player in entities:
             player.interval(now)
 
